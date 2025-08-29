@@ -176,7 +176,6 @@
     document.getElementById('t_prazo').textContent = fmt.format(totals.prazo);
 
     const entradas = totals.cartao + totals.cartao_parcelado + totals.pix_chave + totals.pix_maquina + totals.convenio + totals.prazo;
-    document.getElementById('t_entradas').textContent = fmt.format(entradas);
     document.getElementById('t_saldo').textContent = fmt.format(entradas);
   }
 
