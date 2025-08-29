@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Joyce Linda</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: linear-gradient(135deg, #fff7e6, #ffe6e6); color: #333; }
+    h1 { text-align: center; margin-bottom: 20px; color: #b30000; }
+    .container { max-width: 1200px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,.12); display: grid; grid-template-columns: 350px 1fr; gap: 20px; }
+    label { display: block; margin-top: 10px; font-weight: bold; color:#b30000; }
+    input, select, button { padding: 10px; margin-top: 5px; box-sizing: border-box; font-size: 16px; border-radius: 8px; border:1px solid #ccc; }
+    table { width: 100%; border-collapse: collapse; margin-top: 18px; border-radius: 8px; overflow:hidden; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+    th { background: #ffcc00; color:#b30000; font-weight:bold; }
+    td { background:#fff; }
+    tr:nth-child(even) td { background:#fff8f0; }
+    .right { text-align: right; }
+    .row { display:grid; grid-template-columns: 1fr 180px; gap:12px; align-items:end; }
+    @media(max-width:900px){ .container{ grid-template-columns:1fr; } }
+    .date-nav { display:flex; align-items:center; gap:5px; margin-top:5px; }
+    .date-nav button { flex:1; padding:8px; font-size:14px; background:#ffcc00; color:#b30000; border:none; border-radius:6px; cursor:pointer; font-weight:bold; }
+    .date-nav button:hover { background:#ffdb4d; }
+    button { cursor:pointer; font-weight:bold; border:none; }
+    #addBtn { background:#b30000; color:white; }
+    #addBtn:hover { background:#cc0000; }
+    #detalhesBtn { background:#ffcc00; color:#b30000; }
+    #detalhesBtn:hover { background:#ffdb4d; }
+    #clearBtn { background:#e60000; color:white; border:none; border-radius:8px; padding:10px; }
+    #clearBtn:hover { background:#ff1a1a; }
+  </style>
+</head>
+<body>
+  <h1>📊 Fechamento de Caixa</h1>
+  <div class="container">
+    <!-- Tabela de totais -->
+    <div>
+      <h2 style="color:#b30000;">Totais por Categoria</h2>
+      <label for="dataRef">Data</label>
+      <div class="date-nav">
+        <button id="prevDay">◀</button>
+        <input type="date" id="dataRef" style="flex:2; padding:8px; border:1px solid #ccc; border-radius:6px;" />
+        <button id="nextDay">▶</button>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Categoria</th><th class="right">Total</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Cartão</td><td class="right" id="t_cartao">R$ 0,00</td></tr>
+          <tr><td>Cartão (Parcelado)</td><td class="right" id="t_cartao_parcelado">R$ 0,00</td></tr>
+          <tr><td>PIX (Chave)</td><td class="right" id="t_pix_chave">R$ 0,00</td></tr>
+          <tr><td>PIX (Máquina)</td><td class="right" id="t_pix_maquina">R$ 0,00</td></tr>
+          <tr><td>Convênio</td><td class="right" id="t_convenio">R$ 0,00</td></tr>
+          <tr><td>Prazo</td><td class="right" id="t_prazo">R$ 0,00</td></tr>
+        </tbody>
+        <tfoot>
+          <tr><th>Saldo Final</th><th class="right" id="t_saldo">R$ 0,00</th></tr>
+        </tfoot>
+      </table>
+      <button id="clearBtn" style="margin-top:10px; width:100%;">🗑 Limpar Dados do Dia</button>
+    </div>
+
+    <!-- Formulário + lançamentos detalhados -->
+    <div>
+      <div class="row">
+        <div>
+          <label for="cat">Categoria</label>
+          <select id="cat">
+            <option value="cartao">Cartão</option>
+            <option value="cartao_parcelado">Cartão (Parcelado)</option>
+            <option value="pix_chave">PIX (Chave)</option>
+            <option value="pix_maquina">PIX (Máquina)</option>
+            <option value="convenio">Convênio</option>
+            <option value="prazo">Prazo</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="valor">Valor (modo centavos)</label>
+          <input type="text" id="valor" inputmode="numeric" placeholder="0,00" autocomplete="off" style="width:100%;" />
+        </div>
+      </div>
+
+      <div style="margin-top:12px; display:flex; gap:10px;">
+        <button id="addBtn">➕ Adicionar</button>
+        <button id="detalhesBtn">📄 Ver Lançamentos</button>
+      </div>
+
+      <table id="detalhesTable" style="display:none; margin-top:15px;">
+        <thead>
+          <tr><th>Categoria</th><th class="right">Valor</th></tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+<script>
+  const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  const $valor = document.getElementById('valor');
+  const $cat = document.getElementById('cat');
+  const $tbody = document.getElementById('tbody');
+  const $detalhesTable = document.getElementById('detalhesTable');
+  const $dataRef = document.getElementById('dataRef');
+  const $prevDay = document.getElementById('prevDay');
+  const $nextDay = document.getElementById('nextDay');
+
+  let dados = [];
+  let totals = {};
+
+  function getKey(){
+    return 'caixa_' + $dataRef.value;
+  }
+
+  function salvar(){
+    localStorage.setItem(getKey(), JSON.stringify({dados, totals}));
+  }
+
+  function carregar(){
+    const obj = JSON.parse(localStorage.getItem(getKey()) || '{}');
+    dados = obj.dados || [];
+    totals = obj.totals || {
+      cartao:0, cartao_parcelado:0, pix_chave:0, pix_maquina:0, convenio:0, prazo:0
+    };
+    render();
+  }
+
+  function formatCentsToBRL(cents){
+    const value = cents / 100;
+    return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function onlyDigits(s){
+    return String(s || '').replace(/\D/g, '');
+  }
+
+  $valor.addEventListener('input', (e) => {
+    const el = e.target;
+    let digits = onlyDigits(el.value);
+    if (!digits) {
+      el.dataset.cents = '0';
+      el.value = '';
+      return;
+    }
+    digits = digits.replace(/^0+(?=\d)/, '');
+    const cents = parseInt(digits, 10);
+    el.dataset.cents = String(cents);
+    el.value = formatCentsToBRL(cents);
+  });
+
+  $valor.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    const digits = onlyDigits(text);
+    if (digits) {
+      $valor.dataset.cents = String(parseInt(digits,10));
+      $valor.value = formatCentsToBRL(parseInt(digits,10));
+    }
+  });
+
+  function render(){
+    $tbody.innerHTML = '';
+    dados.forEach(d => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${d.cat}</td><td class="right">${fmt.format(d.valor)}</td>`;
+      $tbody.appendChild(tr);
+    });
+
+    document.getElementById('t_cartao').textContent = fmt.format(totals.cartao);
+    document.getElementById('t_cartao_parcelado').textContent = fmt.format(totals.cartao_parcelado);
+    document.getElementById('t_pix_chave').textContent = fmt.format(totals.pix_chave);
+    document.getElementById('t_pix_maquina').textContent = fmt.format(totals.pix_maquina);
+    document.getElementById('t_convenio').textContent = fmt.format(totals.convenio);
+    document.getElementById('t_prazo').textContent = fmt.format(totals.prazo);
+
+    const entradas = totals.cartao + totals.cartao_parcelado + totals.pix_chave + totals.pix_maquina + totals.convenio + totals.prazo;
+    document.getElementById('t_entradas').textContent = fmt.format(entradas);
+    document.getElementById('t_saldo').textContent = fmt.format(entradas);
+  }
+
+  document.getElementById('addBtn').addEventListener('click', () => {
+    const cents = parseInt($valor.dataset.cents || '0', 10);
+    const valor = cents / 100;
+    if (isNaN(valor) || valor <= 0) {
+      alert('Digite um valor válido (maior que 0).');
+      $valor.focus();
+      return;
+    }
+
+    const categoria = $cat.value;
+    dados.push({ cat: $cat.options[$cat.selectedIndex].text, valor });
+    totals[categoria] = +(totals[categoria] + valor).toFixed(2);
+
+    $valor.dataset.cents = '0';
+    $valor.value = '';
+    render();
+    salvar();
+    $valor.focus();
+  });
+
+  document.getElementById('detalhesBtn').addEventListener('click', () => {
+    $detalhesTable.style.display = $detalhesTable.style.display === 'none' ? 'table' : 'none';
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    if(confirm('Tem certeza que deseja apagar todos os dados deste dia?')){
+      localStorage.removeItem(getKey());
+      carregar();
+    }
+  });
+
+  $dataRef.addEventListener('change', carregar);
+
+  $prevDay.addEventListener('click', () => {
+    const date = new Date($dataRef.value);
+    date.setDate(date.getDate() - 1);
+    $dataRef.value = date.toISOString().split('T')[0];
+    carregar();
+  });
+
+  $nextDay.addEventListener('click', () => {
+    const date = new Date($dataRef.value);
+    date.setDate(date.getDate() + 1);
+    $dataRef.value = date.toISOString().split('T')[0];
+    carregar();
+  });
+
+  $valor.dataset.cents = '0';
+
+  const hoje = new Date().toISOString().split('T')[0];
+  $dataRef.value = hoje;
+  carregar();
+</script>
+</body>
+</html>
